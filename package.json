@@ -7,7 +7,8 @@
     "build": "nuxt generate",
     "preview": "nuxt start",
     "vercel": "cd dist&&vercel",
-    "lint": "eslint --fix --ext \".js,.vue\" --ignore-path .gitignore ."
+    "lint": "eslint --fix --ext \".js,.vue\" --ignore-path .gitignore .",
+    "sdk": "git clone --depth=1 git@github.com:lay2dev/up-poc-bsc.git && rm -rf node_modules/up-poc-bsc && cp -rf up-poc-bsc node_modules/up-poc-bsc && cd node_modules/up-poc-bsc && yarn && yarn build && rm -rf ../../up-poc-bsc"
   },
   "dependencies": {
     "@nuxtjs/axios": "^5.13.1",
@@ -18,7 +19,6 @@
     "element-ui": "^2.15.1",
     "ethereumjs-util": "^7.1.2",
     "up-core-test": "^0.1.6",
-    "up-rangers": "^0.1.2",
     "v-clipboard": "^2.2.3"
   },
   "devDependencies": {

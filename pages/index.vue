@@ -2,10 +2,10 @@
   <div id="page-demo" class="unipass-page">
     <i class="background-logo iconfont icon-logo"></i>
     <div class="head">UniPass Demo</div>
-    <div v-if="username">
+    <div v-if="email">
       <div>
         <br />
-        <h3>{{ username }}</h3>
+        <h3>{{ email }}</h3>
         <br />
       </div>
       <el-button class="transfer" type="primary" @click="logout"
@@ -20,12 +20,7 @@
         login
       </el-button>
     </div>
-    <el-tabs
-      v-show="username"
-      v-model="activeTab"
-      class="body"
-      type="border-card"
-    >
+    <el-tabs v-show="email" v-model="activeTab" class="body" type="border-card">
       <el-tab-pane label="RPG Transaction" name="first">
         <el-form
           ref="form"
@@ -54,21 +49,11 @@
           </el-form-item>
           <el-form-item label="Your Balance">
             <!-- <el-input v-model="myBalanceFormat" disabled readonly /> -->
-            <div class="balance-box">
-              <up-balance name="BNB" />
-              <div class="right">0.02</div>
-            </div>
-            <div class="balance-box">
-              <up-balance name="ETH" />
-              <div class="right">0.02</div>
-            </div>
-            <div class="balance-box">
-              <up-balance name="USDT" />
-              <div class="right">0.02</div>
-            </div>
-            <div class="balance-box">
-              <up-balance name="USDC" />
-              <div class="right">0.02</div>
+            <div v-for="(token, i) in balanceList" :key="i">
+              <div class="balance-box">
+                <up-balance :name="token.symbol" />
+                <div class="right">{{ token.balance }}</div>
+              </div>
             </div>
           </el-form-item>
           <el-form-item label="To">
@@ -98,18 +83,18 @@
           </el-form-item>
           <el-form-item label="Fee">
             <el-radio
-              v-for="(balance, i) in balanceList"
+              v-for="(token, i) in balanceList"
               :key="i"
               v-model="toToken"
-              :label="balance.name"
+              :label="token.symbol"
               class="token-radio"
             >
               <div class="balance-box">
-                <up-balance :name="balance.name" />
+                <up-balance :name="token.symbol" />
                 <div class="right">
-                  <span>{{ balance.fee }}</span>
+                  <span>{{ token.gasFee }}</span>
                   <div class="dot-box">
-                    <div v-show="toToken === balance.name" class="dot"></div>
+                    <div v-show="toToken === token.symbol" class="dot"></div>
                   </div>
                 </div>
               </div>
@@ -179,14 +164,20 @@
 <script lang="ts">
 import Vue from 'vue'
 import { UPAuthMessage, UPAuthResponse } from 'up-core-test'
-import { ChainID, UPRangers } from 'up-rangers'
+import { ChainID, UPBscPoc } from 'up-poc-bsc'
 
 const DAI_ADDRESS = '0x25c58Aa062Efb4f069bD013De3e3C5797fb40651'
+
+export interface BalanceInfo {
+  balance: string
+  symbol: string
+  gasFee: number
+}
 
 export default Vue.extend({
   data() {
     return {
-      username: '',
+      email: '',
       message: 'TO BE SIGNED MESSAGE abc',
       sig: '',
       activeTab: 'first',
@@ -201,22 +192,10 @@ export default Vue.extend({
       toToken: 'BNB',
       txHash: '',
       balanceList: [
-        {
-          name: 'BNB',
-          fee: 0.01,
-        },
-        {
-          name: 'ETH',
-          fee: 0.0001,
-        },
-        {
-          name: 'USDT',
-          fee: 0.1,
-        },
-        {
-          name: 'USDC',
-          fee: 0.1,
-        },
+        { balance: '0', symbol: 'BNB', gasFee: 0.01 },
+        { balance: '0', symbol: 'ETH', gasFee: 0.001 },
+        { balance: '0', symbol: 'USDC', gasFee: 0.1 },
+        { balance: '0', symbol: 'USDT', gasFee: 0.1 },
       ],
       form: {},
       tokenSelect: 'ETH',
@@ -232,8 +211,8 @@ export default Vue.extend({
           icon: require('@/assets/img/BNB.svg'),
         },
       ],
-      // STEP 1: create UPRangers instance
-      upRangers: new UPRangers({
+      // STEP 1: create UPBscPoc instance
+      UPBscPoc: new UPBscPoc({
         chainID: ChainID.testnet,
         userInfoContract: process.env.RANGERS_UNIPASS_CONTRACT,
         upCoreConfig: {
@@ -258,19 +237,19 @@ export default Vue.extend({
       console.log('connect clicked')
       try {
         // STEP 2: connect unipass
-        const account = await this.upRangers.getUPCore().connect({
+        const account = await this.UPBscPoc.getUPCore().connect({
           email: true,
           evmKeys: true,
           chain: '1',
           theme: this.toTheme as any,
         })
-        this.username = account.username
+        this.email = account.email as string
         console.log('account', account)
+        this.email = '874317611@qq.com'
+        // STEP 3: init unipass with email and email
+        await this.UPBscPoc.initUniPass(this.email)
 
-        // STEP 3: init unipass with username and email
-        await this.upRangers.initUniPass(this.username, account.email!)
-
-        this.myAddress = this.upRangers.getAddress()
+        this.myAddress = this.UPBscPoc.getAddress()
         await this.refreshBalance()
       } catch (err) {
         this.$message.error(err as string)
@@ -278,29 +257,28 @@ export default Vue.extend({
       }
     },
     async refreshBalance() {
-      this.myBalance = await this.upRangers
-        .getWeb3()
-        .eth.getBalance(this.myAddress)
+      console.log('refreshBalance', this.myAddress)
+      const balanceList = await this.UPBscPoc.getBalance(this.myAddress)
+      this.balanceList = balanceList as unknown as BalanceInfo[]
+      console.log(this.balanceList)
     },
     logout() {
       console.log('connect clicked')
-      this.upRangers.getUPCore().disconnect()
-      this.username = ''
+      this.UPBscPoc.getUPCore().disconnect()
+      this.email = ''
     },
     async authorize() {
       console.log('authorize clicked')
       this.sig = ''
       console.log({
-        username: this.username,
+        email: this.email,
         message: this.message,
       })
       try {
         // SIGN Message with UniPass
-        const resp = await this.upRangers
-          .getUPCore()
-          .authorize(
-            new UPAuthMessage('PLAIN_MSG', this.username, this.message),
-          )
+        const resp = await this.UPBscPoc.getUPCore().authorize(
+          new UPAuthMessage('PLAIN_MSG', this.email, this.message),
+        )
         console.log('resp', resp)
         this.sig = JSON.stringify(resp)
       } catch (err) {
@@ -312,7 +290,7 @@ export default Vue.extend({
     async verifySig() {
       try {
         // VERIFY user signed message and sig
-        const ret = await this.upRangers.verifyUserSig(
+        const ret = await this.UPBscPoc.verifyUserSig(
           '0x' + Buffer.from(this.message, 'utf-8').toString('hex'),
           JSON.parse(this.sig) as UPAuthResponse,
         )
@@ -332,19 +310,19 @@ export default Vue.extend({
         return
       }
       try {
-        this.upRangers.getUPCore().initPop()
+        this.UPBscPoc.getUPCore().initPop()
 
         // SEND RPG
-        this.txHash = await this.upRangers.transferNativeToken(
+        this.txHash = await this.UPBscPoc.transferNativeToken(
           this.toAddress,
-          this.upRangers.getWeb3().utils.toWei(this.toAmount),
+          this.UPBscPoc.getWeb3().utils.toWei(this.toAmount),
           {
             feeToken: {
               address: '0x0000000000000000000000000000000000000000',
               symbol: 'RPG',
               decimals: 18,
             },
-            feeAmount: this.upRangers.getWeb3().utils.toWei(this.toFeeAmount),
+            feeAmount: this.UPBscPoc.getWeb3().utils.toWei(this.toFeeAmount),
             description: this.toDescription,
           },
         )
@@ -359,24 +337,24 @@ export default Vue.extend({
     },
     async sendToken() {
       try {
-        this.upRangers.getUPCore().initPop()
+        this.UPBscPoc.getUPCore().initPop()
 
         // SEND DAI(ERC20) token
-        this.txHash = await this.upRangers.transferToken(
+        this.txHash = await this.UPBscPoc.transferToken(
           {
             address: DAI_ADDRESS,
             symbol: 'DAI',
             decimals: 18,
           },
           this.toAddress,
-          this.upRangers.getWeb3().utils.toWei(this.toAmount),
+          this.UPBscPoc.getWeb3().utils.toWei(this.toAmount),
           {
             feeToken: {
               address: '0x0000000000000000000000000000000000000000',
               symbol: 'RPG',
               decimals: 18,
             },
-            feeAmount: this.upRangers.getWeb3().utils.toWei(this.toFeeAmount),
+            feeAmount: this.UPBscPoc.getWeb3().utils.toWei(this.toFeeAmount),
             description: this.toDescription,
           },
         )
@@ -390,13 +368,13 @@ export default Vue.extend({
     },
     async executeCall() {
       try {
-        this.upRangers.getUPCore().initPop()
+        this.UPBscPoc.getUPCore().initPop()
 
         // CALL CONTRACT to execute its method
-        this.txHash = await this.upRangers.executeCall(
+        this.txHash = await this.UPBscPoc.executeCall(
           DAI_ADDRESS,
           '0x00',
-          this.upRangers.getWeb3().eth.abi.encodeFunctionCall(
+          this.UPBscPoc.getWeb3().eth.abi.encodeFunctionCall(
             {
               name: 'transfer',
               type: 'function',
@@ -413,7 +391,7 @@ export default Vue.extend({
             },
             [
               this.toAddress,
-              this.upRangers.getWeb3().utils.toWei(this.toAmount),
+              this.UPBscPoc.getWeb3().utils.toWei(this.toAmount),
             ],
           ),
           {
@@ -422,7 +400,7 @@ export default Vue.extend({
               symbol: 'RPG',
               decimals: 18,
             },
-            feeAmount: this.upRangers.getWeb3().utils.toWei(this.toFeeAmount),
+            feeAmount: this.UPBscPoc.getWeb3().utils.toWei(this.toFeeAmount),
             description: this.toDescription,
           },
         )
@@ -527,6 +505,7 @@ export default Vue.extend({
   .balance-box {
     padding: 12px;
     width: 100%;
+    margin-top: 10px;
     background: #f5f5f7;
     border-radius: 10px;
     font-size: 16px;
